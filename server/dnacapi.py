@@ -100,4 +100,21 @@ def getAllNetworkDevices(apiObj):
     return devicesList
 
 
+def getIssues(apiObj):
+
+    issueList=[];
+
+    issues_path = "/dna/intent/api/v1/issues"
+    issuesObj = apiObj.get(issues_path)
+
+    for response in issuesObj["response"]:
+        issue = {
+        }
+        issue['name'] = response['name']
+        issue['status'] = response['status']
+        issue['time'] = response['last_occurence_time']
+        issueList.append(issue)
+
+    return issueList
+
 

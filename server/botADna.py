@@ -34,15 +34,21 @@ import json
 import time
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+from datetime import datetime
+
+import urllib3
+urllib3.disable_warnings()
+
 
 app = Flask(__name__, static_folder='../static/dist', template_folder='../static')
 
 '''
 Set the bearer token, email ,name etc
 '''
-bearer = "Yj...."
-bot_email = 'bot...@sparkbot.io'
-bot_name = "bot...."
+# Modify here
+bearer = "XXXXXX"
+bot_email = 'dcndev_podX@webex.bot'
+bot_name = "PodX Bot"
 line_separator = "\n******************************************************************************************\n"
 
 #Global API Object
@@ -98,7 +104,7 @@ def postImageToSpark(webhook,imageName,description):
                           'files': (description, open(imageName, 'rb'),
                                     'image/jpg')})
 
-    requests.post('https://api.ciscospark.com/v1/messages', data=media,
+    requests.post('https://api.webexapis.com/v1/messages', data=media,
                       headers={'Authorization': 'Bearer ' + bearer,
                                'Content-Type': media.content_type})
 
@@ -172,6 +178,10 @@ def processMessage(in_message, webhook):
     elif 'logout' in in_message.lower():
         handleLogout(webhook)
 
+    # DCNDEV issues
+    elif 'issues' in in_message:
+        handleIssues(webhook)
+
     #show help if unable to understand the message
     else:
         handleHelp(webhook)
@@ -213,6 +223,7 @@ def handleConnection(in_message, webhook):
         msg = msg + "6. list-devices                                                                     Lists Devices on the network\n"
         msg = msg + "7. help                                                                                 Detailed health information per Site\n"
         msg = msg + "8. logout                                                                              Disconnect current connection to cluster\n"
+        msg = msg + "DCNDEV: issues                       Display current issues list\n"
     else:
         msg = "Cluster credentials incorrect/ Unable to authenticate.Please try again"
     sendSparkPOST("https://api.ciscospark.com/v1/messages", {"roomId": webhook['data']['roomId'], "text": msg})
@@ -239,7 +250,7 @@ def handleClient(in_message, webhook):
         # Send a wait message
         waitMessage = 'Please wait while I fetch the data   ' + u"\U0001F557"
         sendSparkPOST("https://api.ciscospark.com/v1/messages",
-                      {"roomId": webhook['data']['roomId'], "text": str(waitMessage)})
+            {"roomId": webhook['data']['roomId'], "text": str(waitMessage)})
 
         # get client details for MAC from API
         millis = int(round(time.time() * 1000))
@@ -271,7 +282,7 @@ def handleClient(in_message, webhook):
         else:
             data = 'I cannot find this client on the network.Can you try a different MAC?'
             sendSparkPOST("https://api.ciscospark.com/v1/messages",
-                          {"roomId": webhook['data']['roomId'], "text": data})
+                {"roomId": webhook['data']['roomId'], "text": data})
     else:
         msg = "Not connected to any cluster, please connect and try again."
         sendSparkPOST("https://api.ciscospark.com/v1/messages", {"roomId": webhook['data']['roomId'], "text": msg})
@@ -291,7 +302,7 @@ def handleNetworkDevice(in_message, webhook):
         # Send a wait message
         waitMessage = 'Please wait while I fetch the data   '+ u"\U0001F557"
         sendSparkPOST("https://api.ciscospark.com/v1/messages",
-                      {"roomId": webhook['data']['roomId'], "text": str(waitMessage)})
+            {"roomId": webhook['data']['roomId'], "text": str(waitMessage)})
 
         timestamp = int(round(time.time() * 1000))
         networkDevice = dnacapi.getNetworkDevice(timestamp,deviceName,'nwDeviceName',apiObj)
@@ -408,6 +419,7 @@ def handleHelp(webhook):
     msg = msg + "6. list-devices                                                                     Lists Devices on the network\n"
     msg = msg + "7. help                                                                                 Detailed health information per Site\n"
     msg = msg + "8. logout                                                                              Disconnect current connection to cluster\n"
+    msg = msg + "DCNDEV: issues                       Display current issues list\n"
 
     sendSparkPOST("https://api.ciscospark.com/v1/messages", {"roomId": webhook['data']['roomId'], "text": msg})
 
@@ -477,6 +489,33 @@ def drawBarChart(networkHealth,clientHealth,filename):
     ax.set_title('Overall Site Health')
 
     plt.savefig(filename)
+
+def handleIssues(webhook):
+    if validateConnection():
+        waitMessage = 'Please wait while I fetch the data   ' + u"\U0001F557"
+        sendSparkPOST("https://webexapis.com/v1/messages",
+            {"roomId": webhook['data']['roomId'], "text": str(waitMessage)})
+
+        issuesList = dnacapi.getIssues(apiObj)
+
+        if issuesList is not None:
+            data= "Currently active issues:"+ line_separator
+            print (issuesList)
+            for issue in issuesList:
+                data = data + "Name: "+ issue['name']+"\n"
+                data = data + "Status: " + issue['status'] + "\n"
+                data = data + "Time: " + str(datetime.fromtimestamp(issue['time']/1000.0)) + "\n\n"
+
+            sendSparkPOST("https://webexapis.com/v1/messages",
+                {"roomId": webhook['data']['roomId'], "text": data})
+
+        else:
+            data = 'Sorry! I am having some trouble now.Can you try again or try a different command?'
+            sendSparkPOST("https://webexapis.com/v1/messages",
+                {"roomId": webhook['data']['roomId'], "text": data})
+    else:
+        msg = "Not connected to any cluster, please connect and try again."
+        sendSparkPOST("https://webexapis.com/v1/messages", {"roomId": webhook['data']['roomId'], "text": msg})
 
 
 if __name__ == '__main__':
